@@ -877,6 +877,8 @@
             token = await loginApi(user, pwd);
             currentUser = user;
             privateKey = await importPrivKey(privPem);
+            // 缓存私钥 PEM 到 sessionStorage
+            sessionStorage.setItem('priv_' + user, privPem);
             localStorage.setItem('token', token);
             localStorage.setItem('user', user);
 
@@ -906,6 +908,9 @@
             // 用口令解密私钥
             const privPem = await decryptPrivateKey(encryptedPriv, pwd);
             privateKey = await importPrivKey(privPem);
+
+            // 缓存私钥 PEM 到 sessionStorage（刷新页面不丢失，关标签页自动清除）
+            sessionStorage.setItem('priv_' + user, privPem);
 
             localStorage.setItem('token', token);
             localStorage.setItem('user', user);
@@ -1303,17 +1308,21 @@
     // ============================================================
     //  初始化
     // ============================================================
-    (function init() {
+    (async function init() {
         const savedToken = localStorage.getItem('token');
         const savedUser = localStorage.getItem('user');
         if (savedToken && savedUser) {
             token = savedToken;
             currentUser = savedUser;
             const priv = localStorage.getItem('sk_' + savedUser);
-            if (priv) {
-                // 注意：这里初始加载时无法解密私钥，因为没有密码
-                // 需要用户重新登录才能使用私钥
-                privateKey = null;
+            const cachedPriv = sessionStorage.getItem('priv_' + savedUser);
+            if (priv || cachedPriv) {
+                if (cachedPriv) {
+                    // 从 sessionStorage 恢复私钥（刷新页面不丢失）
+                    privateKey = await importPrivKey(cachedPriv);
+                } else {
+                    privateKey = null;
+                }
                 document.getElementById('display-username').textContent = savedUser;
                 document.getElementById('userAvatar').textContent = savedUser.charAt(0).toUpperCase();
                 switchTab('files');
