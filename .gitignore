@@ -1,0 +1,30 @@
+# 环境变量（含密钥）
+.env
+
+# 数据库（运行时创建）
+file_sharing.db
+file_sharing.db-journal
+file_sharing.db-wal
+file_sharing.db-shm
+
+# 上传文件
+uploads/*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# 打包输出
+dist/
+build/
+*.spec
+
+# 测试缓存
+.pytest_cache/
+test.db
+
+# 系统
+Thumbs.db
+.DS_Store

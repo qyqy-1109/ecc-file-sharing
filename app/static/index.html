@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECC文件共享系统</title>
+    <style>
+        /* ===== 全局样式 ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            min-height: 100vh;
+        }
+        a { color: #1890ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ===== 布局 ===== */
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ===== 头部 ===== */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 24px 30px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .header h1 span {
+            color: #64ffda;
+        }
+        .header .subtitle {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.6);
+            margin-top: 4px;
+        }
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ===== 卡片 ===== */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 24px 28px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 18px;
+            color: #1a1a2e;
+            border-bottom: 2px solid #f0f2f5;
+            padding-bottom: 12px;
+        }
+
+        /* ===== 表单 ===== */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #444;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            transition: border 0.2s;
+            background: #fafafa;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #1890ff;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(24,144,255,0.15);
+        }
+
+        /* ===== 按钮 ===== */
+        .btn {
+            display: inline-block;
+            padding: 9px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn-primary { background: #1890ff; color: white; }
+        .btn-primary:hover { background: #40a9ff; }
+        .btn-success { background: #52c41a; color: white; }
+        .btn-warning { background: #faad14; color: white; }
+        .btn-danger { background: #ff4d4f; color: white; }
+        .btn-default { background: #f0f2f5; color: #333; border: 1px solid #d9d9d9; }
+        .btn-default:hover { background: #e6e8eb; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+        .btn-block { width: 100%; }
+
+        /* ===== 消息提示 ===== */
+        .msg {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        .msg.show { display: block; }
+        .msg.error { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+        .msg.success { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+
+        /* ===== 标签栏 ===== */
+        .tab-bar {
+            display: flex;
+            gap: 0;
+            background: #f0f2f5;
+            border-radius: 8px;
+            padding: 3px;
+            max-width: 300px;
+            margin: 0 auto 24px auto;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: white;
+            color: #1890ff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        .tab-btn:hover:not(.active) { color: #333; }
+
+        /* ===== 视图切换 ===== */
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* ===== 用户信息栏 ===== */
+        .user-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #eee;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .user-info .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #1890ff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .user-info .username {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .user-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        /* ===== 上传区 ===== */
+        .upload-area {
+            background: #fafafa;
+            border: 2px dashed #d9d9d9;
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+            transition: border-color 0.2s;
+        }
+        .upload-area:hover {
+            border-color: #1890ff;
+        }
+        .upload-area .upload-left {
+            flex: 1;
+            min-width: 180px;
+        }
+        .upload-area .upload-left h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+        .upload-area .upload-left p {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 4px;
+        }
+        .upload-area .upload-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* ===== 搜索与批量 ===== */
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .toolbar .search-box {
+            flex: 1;
+            min-width: 180px;
+            position: relative;
+        }
+        .toolbar .search-box input {
+            width: 100%;
+            padding: 8px 14px 8px 36px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: #fafafa;
+        }
+        .toolbar .search-box input:focus {
+            outline: none;
+            border-color: #1890ff;
+            background: white;
+        }
+        .toolbar .search-box .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+        .toolbar .batch-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* ===== 文件列表 ===== */
+        .file-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .file-list-header h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+        .file-list-header .count {
+            font-size: 0.8rem;
+            color: #888;
+            background: #f5f5f5;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.15s;
+            background: white;
+        }
+        .file-item:hover {
+            border-color: #d9d9d9;
+            background: #fafafa;
+        }
+        .file-item .checkbox-col {
+            padding-top: 2px;
+        }
+        .file-item .checkbox-col input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #1890ff;
+            cursor: pointer;
+        }
+        .file-item .file-body {
+            flex: 1;
+            min-width: 0;
+        }
+        .file-item .file-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #1a1a2e;
+            word-break: break-all;
+        }
+        .file-item .file-meta {
+            font-size: 0.78rem;
+            color: #888;
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+        .file-item .file-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .file-item .expand-form {
+            margin-top: 10px;
+            display: none;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding: 12px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .file-item .expand-form.show {
+            display: flex;
+        }
+        .file-item .expand-form input {
+            flex: 1;
+            min-width: 130px;
+            padding: 7px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .file-item .expand-form input:focus {
+            outline: none;
+            border-color: #1890ff;
+        }
+
+        /* ===== 空状态 ===== */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #999;
+        }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+        .empty-state h4 { font-size: 1.05rem; color: #666; margin-bottom: 6px; }
+        .empty-state p { font-size: 0.85rem; }
+
+        /* ===== 模态框 ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.45);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-box {
+            background: white;
+            border-radius: 12px;
+            padding: 28px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        }
+        .modal-box h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1a1a2e;
+        }
+        .modal-box .form-group { margin-bottom: 14px; }
+        .modal-box .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .modal-box .modal-actions .btn { flex: 1; }
+
+        /* ===== 页脚 ===== */
+        .footer {
+            text-align: center;
+            padding: 20px 0 10px;
+            font-size: 0.8rem;
+            color: #bbb;
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 700px) {
+            .container { padding: 12px; }
+            .header { padding: 18px 20px; }
+            .header h1 { font-size: 1.2rem; }
+            .card { padding: 16px 18px; }
+            .upload-area { flex-direction: column; align-items: stretch; }
+            .upload-area .upload-right { justify-content: center; }
+            .user-bar { flex-direction: column; align-items: stretch; }
+            .user-actions { justify-content: center; }
+            .toolbar { flex-direction: column; }
+            .toolbar .batch-actions { justify-content: center; }
+            .file-item { flex-direction: column; }
+            .file-item .expand-form { flex-direction: column; }
+            .tab-bar { max-width: 100%; }
+        }
+
+        /* 一些小工具 */
+        .mt-10 { margin-top: 10px; }
+        .mb-10 { margin-bottom: 10px; }
+        .text-center { text-align: center; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- ===== 头部 ===== -->
+    <div class="header">
+        <div>
+            <h1>🔐 ECC <span>安全文件共享</span></h1>
+        </div>
+        <div class="header-actions" id="header-actions">
+            <!-- JS动态填充 -->
+        </div>
+    </div>
+
+    <!-- ===== 注册视图 ===== -->
+    <div class="view active" id="register-view">
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('register')">📝 注册</button>
+            <button class="tab-btn" onclick="switchTab('login')">🔑 登录</button>
+        </div>
+        <div class="card" style="max-width:420px; margin:0 auto;">
+            <div class="card-title">📝 创建新账号</div>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="reg-username" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="reg-password" placeholder="至少6位密码">
+            </div>
+            <button class="btn btn-primary btn-block" onclick="handleRegister()">立即注册</button>
+            <div class="msg" id="reg-msg"></div>
+        </div>
+    </div>
+
+    <!-- ===== 登录视图 ===== -->
+    <div class="view" id="login-view">
+        <div class="tab-bar">
+            <button class="tab-btn" onclick="switchTab('register')">📝 注册</button>
+            <button class="tab-btn active" onclick="switchTab('login')">🔑 登录</button>
+        </div>
+        <div class="card" style="max-width:420px; margin:0 auto;">
+            <div class="card-title">🔑 登录</div>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="login-username" placeholder="输入用户名">
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="login-password" placeholder="输入密码">
+            </div>
+            <button class="btn btn-primary btn-block" onclick="handleLogin()">登录</button>
+            <div class="msg" id="login-msg"></div>
+        </div>
+    </div>
+
+    <!-- ===== 文件视图 ===== -->
+    <div class="view" id="files-view">
+
+        <!-- 用户栏 -->
+        <div class="user-bar">
+            <div class="user-info">
+                <div class="avatar" id="userAvatar">U</div>
+                <div>
+                    <div class="username">👋 欢迎，<span id="display-username"></span></div>
+                </div>
+            </div>
+            <div class="user-actions">
+                <button class="btn btn-default btn-sm" onclick="showChangePwd()">🔑 改密</button>
+                <button class="btn btn-default btn-sm" onclick="exportKey()">💾 导出私钥</button>
+                <button class="btn btn-default btn-sm" onclick="importKey()">📂 恢复</button>
+                <button class="btn btn-danger btn-sm" onclick="handleDeleteAccount()">⚠️ 注销</button>
+                <button class="btn btn-danger btn-sm" onclick="handleLogout()">🚪 登出</button>
+            </div>
+        </div>
+
+        <!-- 上传区 -->
+        <div class="upload-area">
+            <div class="upload-left">
+                <h3>📤 上传文件</h3>
+                <p>AES-256-GCM 加密后上传，密钥用 ECC 加密保护</p>
+            </div>
+            <div class="upload-right">
+                <input type="file" id="fileInput" style="font-size:0.85rem; max-width:180px;">
+                <button class="btn btn-primary" onclick="handleUpload()">上传</button>
+            </div>
+            <div class="msg" id="upload-msg" style="width:100%; margin-top:8px;"></div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="搜索文件名..." oninput="refreshFileList()">
+            </div>
+            <div class="batch-actions">
+                <button class="btn btn-danger btn-sm" onclick="batchDelete()">🗑️ 批量删除</button>
+                <button class="btn btn-warning btn-sm" onclick="batchShare()">🔗 批量分享</button>
+            </div>
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="card">
+            <div class="file-list-header">
+                <h3>📄 我的文件</h3>
+                <span class="count" id="fileCount">0 个</span>
+            </div>
+            <div id="fileListContainer">
+                <!-- 动态渲染 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 页脚 ===== -->
+    <div class="footer">
+        ECC 安全文件共享系统 &copy; 2026 &middot; 毕业设计
+    </div>
+</div>
+
+<!-- ===== 注销账户模态框 ===== -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-box">
+        <h3>⚠️ 注销账户</h3>
+        <p style="color:#cf1322;margin-bottom:12px;font-size:0.9rem;">
+            此操作不可撤销！将永久删除您的账户及所有数据。
+        </p>
+        <div class="form-group">
+            <label>请输入私钥以验证身份（PEM 格式）</label>
+            <textarea id="deletePrivKey" rows="5" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" style="width:100%;padding:10px;border:1px solid #d9d9d9;border-radius:6px;font-family:monospace;font-size:0.8rem;resize:vertical;"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-danger" onclick="confirmDeleteAccount()">验证并注销</button>
+            <button class="btn btn-default" onclick="closeModal('deleteModal')">取消</button>
+        </div>
+        <div class="msg" id="delete-msg" style="margin-top:10px;"></div>
+    </div>
+</div>
+
+<!-- ===== 修改密码模态框 ===== -->
+<div class="modal-overlay" id="pwdModal">
+    <div class="modal-box">
+        <h3>🔑 修改密码</h3>
+        <div class="form-group">
+            <label>旧密码</label>
+            <input type="password" id="oldPwd" placeholder="输入当前密码">
+        </div>
+        <div class="form-group">
+            <label>新密码</label>
+            <input type="password" id="newPwd" placeholder="至少6位">
+        </div>
+        <div class="form-group">
+            <label>确认新密码</label>
+            <input type="password" id="confirmPwd" placeholder="再次输入">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="confirmChangePwd()">确认</button>
+            <button class="btn btn-default" onclick="closeModal('pwdModal')">取消</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    //  全局变量
+    // ============================================================
+    const API = '';
+    let token = null;
+    let currentUser = null;
+    let privateKey = null;
+    let allFiles = [];
+
+    // ============================================================
+    //  工具函数
+    // ============================================================
+    function showMsg(id, type, text) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.className = 'msg show ' + type;
+        el.textContent = text;
+        setTimeout(() => { el.className = 'msg'; }, 4000);
+    }
+
+    function showError(id, text) { showMsg(id, 'error', '❌ ' + text); }
+    function showSuccess(id, text) { showMsg(id, 'success', '✅ ' + text); }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(tab + '-view').classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.textContent.includes(tab === 'register' ? '注册' : '登录'));
+        });
+        const tabs = document.querySelectorAll('.tab-bar');
+        tabs.forEach(t => {
+            t.style.display = (tab === 'files') ? 'none' : 'flex';
+        });
+    }
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function formatTime(s) {
+        if (!s) return '';
+        try {
+            const d = new Date(s);
+            if (isNaN(d.getTime())) return s;
+            return d.toLocaleString();
+        } catch(e) { return s; }
+    }
+
+    // ============================================================
+    //  密码学函数
+    // ============================================================
+    async function genECC() {
+        return await crypto.subtle.generateKey(
+            { name: 'ECDH', namedCurve: 'P-384' }, true, ['deriveKey','deriveBits']
+        );
+    }
+
+    async function pubKeyToPem(key) {
+        const spki = await crypto.subtle.exportKey('spki', key);
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(spki)));
+        return '-----BEGIN PUBLIC KEY-----\n' + b64.match(/.{1,64}/g).join('\n') + '\n-----END PUBLIC KEY-----';
+    }
+
+    async function privKeyToPem(key) {
+        const pkcs8 = await crypto.subtle.exportKey('pkcs8', key);
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(pkcs8)));
+        return '-----BEGIN PRIVATE KEY-----\n' + b64.match(/.{1,64}/g).join('\n') + '\n-----END PRIVATE KEY-----';
+    }
+
+    async function importPubKey(pem) {
+        const s = pem.replace('-----BEGIN PUBLIC KEY-----','').replace('-----END PUBLIC KEY-----','').replace(/\s/g,'');
+        return await crypto.subtle.importKey('spki', Uint8Array.from(atob(s),c=>c.charCodeAt(0)),
+            { name:'ECDH', namedCurve:'P-384' }, true, []);
+    }
+
+    async function importPrivKey(pem) {
+        const s = pem.replace('-----BEGIN PRIVATE KEY-----','').replace('-----END PRIVATE KEY-----','').replace(/\s/g,'');
+        return await crypto.subtle.importKey('pkcs8', Uint8Array.from(atob(s),c=>c.charCodeAt(0)),
+            { name:'ECDH', namedCurve:'P-384' }, true, ['deriveKey','deriveBits']);
+    }
+
+    async function eccEncrypt(pubKey, aesKey) {
+        const ephem = await genECC();
+        const bits = await crypto.subtle.deriveBits(
+            { name:'ECDH', public: pubKey }, ephem.privateKey, 384);
+        const hkdf = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
+        const derived = await crypto.subtle.deriveKey(
+            { name:'HKDF', hash:'SHA-256', salt:new Uint8Array(0), info:new TextEncoder().encode('file-sharing-ecies') },
+            hkdf, { name:'AES-GCM', length:256 }, false, ['encrypt']);
+        const raw = await crypto.subtle.exportKey('raw', aesKey);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const enc = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, derived, raw);
+        const pubPem = await pubKeyToPem(ephem.publicKey);
+        return pubPem + '||' + btoa(String.fromCharCode(...iv)) + '||' + btoa(String.fromCharCode(...new Uint8Array(enc)));
+    }
+
+    async function eccDecrypt(privKey, data) {
+        const parts = data.split('||');
+        const pub = await importPubKey(parts[0]);
+        const iv = Uint8Array.from(atob(parts[1]), c=>c.charCodeAt(0));
+        const ct = Uint8Array.from(atob(parts[2]), c=>c.charCodeAt(0));
+        const bits = await crypto.subtle.deriveBits({ name:'ECDH', public: pub }, privKey, 384);
+        const hkdf = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
+        const derived = await crypto.subtle.deriveKey(
+            { name:'HKDF', hash:'SHA-256', salt:new Uint8Array(0), info:new TextEncoder().encode('file-sharing-ecies') },
+            hkdf, { name:'AES-GCM', length:256 }, false, ['decrypt']);
+        const raw = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, derived, ct);
+        return await crypto.subtle.importKey('raw', raw, 'AES-GCM', true, ['encrypt','decrypt']);
+    }
+
+    async function aesEncrypt(file, key) {
+        const data = await file.arrayBuffer();
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const enc = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, data);
+        return new Blob([iv, enc]);
+    }
+
+    async function aesDecrypt(blob, key) {
+        const buf = await blob.arrayBuffer();
+        const iv = new Uint8Array(buf.slice(0, 12));
+        const ct = buf.slice(12);
+        return await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    }
+
+    async function genAesKey() {
+        return await crypto.subtle.generateKey({ name:'AES-GCM', length:256 }, true, ['encrypt','decrypt']);
+    }
+
+    // ============================================================
+    //  新增：密码派生与私钥加解密函数
+    // ============================================================
+
+    // 从密码派生 AES 密钥（用于加密私钥）
+    async function deriveKeyFromPassword(password, salt) {
+        const encoder = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw', encoder.encode(password), 'PBKDF2', false, ['deriveKey']
+        );
+        return await crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 600000,
+                hash: 'SHA-256'
+            },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+
+    // 用口令加密私钥
+    async function encryptPrivateKey(privateKeyPem, password) {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const key = await deriveKeyFromPassword(password, salt);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encoder = new TextEncoder();
+        const data = encoder.encode(privateKeyPem);
+        const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, data);
+        const result = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+        result.set(salt, 0);
+        result.set(iv, salt.length);
+        result.set(new Uint8Array(encrypted), salt.length + iv.length);
+        return btoa(String.fromCharCode(...result));
+    }
+
+    // 用口令解密私钥
+    async function decryptPrivateKey(encryptedData, password) {
+        try {
+            const data = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
+            const salt = data.slice(0, 16);
+            const iv = data.slice(16, 28);
+            const ciphertext = data.slice(28);
+            const key = await deriveKeyFromPassword(password, salt);
+            const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
+            const decoder = new TextDecoder();
+            return decoder.decode(decrypted);
+        } catch (e) {
+            throw new Error('密码错误或私钥数据已损坏');
+        }
+    }
+
+    // ============================================================
+    //  API 封装
+    // ============================================================
+   async function api(method, path, body, needAuth) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (needAuth && token) headers['Authorization'] = 'Bearer ' + token;
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+    const resp = await fetch(API + path, opts);
+    if (!resp.ok) {
+        let msg = '请求失败';
+        try {
+            const j = await resp.json();
+            if (j.detail) {
+                if (Array.isArray(j.detail)) {
+                    msg = j.detail.map(d => d.msg || JSON.stringify(d)).join('; ');
+                } else {
+                    msg = j.detail;
+                }
+            } else {
+                msg = JSON.stringify(j);
+            }
+        } catch(e) { msg = await resp.text(); }
+        throw new Error(msg);
+    }
+    return await resp.json();
+}
+
+    async function loginApi(user, pwd) {
+        const fd = new URLSearchParams();
+        fd.append('username', user);
+        fd.append('password', pwd);
+        const resp = await fetch(API + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: fd
+        });
+        if (!resp.ok) throw new Error('用户名或密码错误');
+        return (await resp.json()).access_token;
+    }
+
+    // 获取文件加密密钥（不下载文件内容）
+    async function getFileKey(fileId) {
+        const resp = await fetch(API + '/files/' + fileId + '/key', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!resp.ok) throw new Error('获取密钥失败');
+        const data = await resp.json();
+        return data.encrypted_key;
+    }
+
+    // ============================================================
+    //  注册逻辑（私钥加密存储 + 自动登录）
+    // ============================================================
+    async function handleRegister() {
+        const user = document.getElementById('reg-username').value.trim();
+        const pwd = document.getElementById('reg-password').value;
+        if (!user || !pwd) { showError('reg-msg', '请填完所有字段'); return; }
+        if (pwd.length < 6) {
+            showError('reg-msg', '密码长度不能少于6位');
+            return;
+        }
+        try {
+            const kp = await genECC();
+            const pubPem = await pubKeyToPem(kp.publicKey);
+            const privPem = await privKeyToPem(kp.privateKey);
+
+            // 1. 注册
+            await api('POST', '/auth/register', { username: user, password: pwd, public_key: pubPem });
+
+            // 2. 用口令加密私钥后存储
+            const encryptedPrivKey = await encryptPrivateKey(privPem, pwd);
+            localStorage.setItem('sk_' + user, encryptedPrivKey);
+
+            // 3. 自动登录
+            showSuccess('reg-msg', '注册成功，正在自动登录...');
+            token = await loginApi(user, pwd);
+            currentUser = user;
+            privateKey = await importPrivKey(privPem);
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', user);
+
+            // 4. 跳转到文件页
+            document.getElementById('display-username').textContent = user;
+            document.getElementById('userAvatar').textContent = user.charAt(0).toUpperCase();
+            switchTab('files');
+            refreshFileList();
+        } catch(e) { showError('reg-msg', e.message); }
+    }
+
+    // ============================================================
+    //  登录逻辑（解密私钥）
+    // ============================================================
+    async function handleLogin() {
+        const user = document.getElementById('login-username').value.trim();
+        const pwd = document.getElementById('login-password').value;
+        if (!user || !pwd) { showError('login-msg', '请填完所有字段'); return; }
+        try {
+            token = await loginApi(user, pwd);
+            currentUser = user;
+
+            // 从 localStorage 获取加密的私钥
+            const encryptedPriv = localStorage.getItem('sk_' + user);
+            if (!encryptedPriv) throw new Error('未找到私钥，请重新注册');
+
+            // 用口令解密私钥
+            const privPem = await decryptPrivateKey(encryptedPriv, pwd);
+            privateKey = await importPrivKey(privPem);
+
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', user);
+            document.getElementById('display-username').textContent = user;
+            document.getElementById('userAvatar').textContent = user.charAt(0).toUpperCase();
+            switchTab('files');
+            refreshFileList();
+        } catch(e) { showError('login-msg', e.message); }
+    }
+
+    // ============================================================
+    //  注销账户
+    // ============================================================
+    function handleDeleteAccount() {
+        document.getElementById('delete-msg').className = 'msg';
+        document.getElementById('delete-msg').textContent = '';
+        document.getElementById('deletePrivKey').value = '';
+        document.getElementById('deleteModal').classList.add('show');
+    }
+
+    async function confirmDeleteAccount() {
+        const msgEl = document.getElementById('delete-msg');
+        const privPem = document.getElementById('deletePrivKey').value.trim();
+        if (!privPem) { showError('delete-msg', '请粘贴私钥'); return; }
+
+        // 步骤1: 验证私钥
+        try {
+            showMsg('delete-msg', 'info', '⏳ 正在验证私钥...');
+            const privKey = await importPrivKey(privPem);
+
+            // 从服务器获取公钥
+            const resp = await fetch('/users/' + currentUser + '/public_key', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!resp.ok) throw new Error('无法获取公钥');
+            const { public_key: pubKeyPem } = await resp.json();
+            const pubKey = await importPubKey(pubKeyPem);
+
+            // ECDH 验证: 用临时密钥对做两次派生，比对结果
+            const ephem = await genECC();
+            const bits1 = new Uint8Array(await crypto.subtle.deriveBits(
+                { name: 'ECDH', public: ephem.publicKey }, privKey, 384));
+            const bits2 = new Uint8Array(await crypto.subtle.deriveBits(
+                { name: 'ECDH', public: pubKey }, ephem.privateKey, 384));
+
+            const match = bits1.length === bits2.length && bits1.every((b, i) => b === bits2[i]);
+            if (!match) {
+                showError('delete-msg', '私钥验证失败，与账户不匹配');
+                return;
+            }
+        } catch (e) {
+            showError('delete-msg', '私钥格式错误: ' + e.message);
+            return;
+        }
+
+        // 步骤2: 二次确认
+        const confirmText = prompt('私钥验证通过 ✓\n\n请输入 "DELETE" 确认注销账户（不可撤销）：');
+        if (confirmText !== 'DELETE') {
+            if (confirmText !== null) showMsg('delete-msg', 'info', '已取消，请输入 DELETE 确认');
+            return;
+        }
+
+        // 步骤3: 执行注销
+        try {
+            showMsg('delete-msg', 'info', '⏳ 正在注销...');
+            await api('DELETE', '/users/me', null, true);
+            closeModal('deleteModal');
+            alert('账户已注销。');
+            handleLogout();
+        } catch (e) {
+            showError('delete-msg', '注销失败: ' + e.message);
+        }
+    }
+
+    // ============================================================
+    //  登出
+    // ============================================================
+    function handleLogout() {
+        token = null;
+        currentUser = null;
+        privateKey = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        switchTab('register');
+        document.getElementById('reg-username').value = '';
+        document.getElementById('reg-password').value = '';
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+    }
+
+    // ============================================================
+    //  密钥管理（导出需密码验证，导入需密码加密）
+    // ============================================================
+    function exportKey() {
+        const encryptedPriv = localStorage.getItem('sk_' + currentUser);
+        if (!encryptedPriv) { alert('未找到私钥'); return; }
+
+        const pwd = prompt('请输入登录密码以导出私钥：');
+        if (!pwd) return;
+
+        decryptPrivateKey(encryptedPriv, pwd).then(privPem => {
+            const blob = new Blob([privPem], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ecc_private_key_' + currentUser + '.pem';
+            a.click();
+            URL.revokeObjectURL(url);
+            alert('私钥已导出，请妥善保管！');
+        }).catch(() => {
+            alert('密码错误，无法导出私钥');
+        });
+    }
+
+    function importKey() {
+        const inp = document.createElement('input');
+        inp.type = 'file';
+        inp.accept = '.pem,.txt';
+        inp.onchange = async (e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const text = await f.text();
+            if (!text.includes('BEGIN PRIVATE KEY')) {
+                alert('无效的私钥文件');
+                return;
+            }
+
+            const pwd = prompt('请输入当前登录密码，用于加密存储导入的私钥：');
+            if (!pwd) return;
+
+            if (confirm('确定恢复私钥到 ' + currentUser + ' ？将覆盖现有私钥。')) {
+                try {
+                    const encryptedPriv = await encryptPrivateKey(text, pwd);
+                    localStorage.setItem('sk_' + currentUser, encryptedPriv);
+                    alert('私钥恢复成功！请重新登录');
+                    handleLogout();
+                } catch(err) {
+                    alert('私钥导入失败: ' + err.message);
+                }
+            }
+        };
+        inp.click();
+    }
+
+    // ============================================================
+    //  修改密码
+    // ============================================================
+    function showChangePwd() {
+        document.getElementById('pwdModal').classList.add('show');
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('show');
+    }
+    async function confirmChangePwd() {
+        const old = document.getElementById('oldPwd').value;
+        const np = document.getElementById('newPwd').value;
+        const cp = document.getElementById('confirmPwd').value;
+        if (np !== cp) { alert('两次密码不一致'); return; }
+        if (np.length < 6) { alert('密码至少6位'); return; }
+        try {
+            // 先用旧密码解密私钥，再用新密码重新加密
+            const encryptedPriv = localStorage.getItem('sk_' + currentUser);
+            if (!encryptedPriv) throw new Error('未找到本地私钥');
+            const privPem = await decryptPrivateKey(encryptedPriv, old);
+            const reEncrypted = await encryptPrivateKey(privPem, np);
+
+            // 更新后端密码
+            const resp = await fetch(API + '/auth/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ old_password: old, new_password: np })
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+
+            // 用新密码加密的私钥替换旧记录
+            localStorage.setItem('sk_' + currentUser, reEncrypted);
+
+            alert('密码修改成功，请重新登录');
+            closeModal('pwdModal');
+            document.getElementById('oldPwd').value = '';
+            document.getElementById('newPwd').value = '';
+            document.getElementById('confirmPwd').value = '';
+            handleLogout();
+        } catch(e) { alert('修改失败: ' + e.message); }
+    }
+
+    // 点击蒙层关闭
+    document.getElementById('pwdModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal('pwdModal');
+    });
+    document.getElementById('deleteModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal('deleteModal');
+    });
+
+    // ============================================================
+    //  文件操作
+    // ============================================================
+
+    // 上传
+    async function handleUpload() {
+        const inp = document.getElementById('fileInput');
+        const file = inp.files[0];
+        if (!file) { alert('请选择文件'); return; }
+        try {
+            const aesKey = await genAesKey();
+            const encBlob = await aesEncrypt(file, aesKey);
+            const pubData = await api('GET', '/users/' + currentUser + '/public_key', null, true);
+            const pubKey = await importPubKey(pubData.public_key);
+            const encKey = await eccEncrypt(pubKey, aesKey);
+
+            const fd = new FormData();
+            fd.append('file', new File([encBlob], file.name + '.enc', { type: 'application/octet-stream' }));
+            fd.append('encrypted_key', encKey);
+            fd.append('original_filename', file.name);
+
+            const resp = await fetch(API + '/files/upload', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: fd
+            });
+            if (!resp.ok) throw new Error('上传失败');
+            showSuccess('upload-msg', '「' + file.name + '」上传成功');
+            inp.value = '';
+            refreshFileList();
+        } catch(e) { showError('upload-msg', e.message); }
+    }
+
+    // 下载
+    async function handleDownload(fileId) {
+        try {
+            const resp = await fetch(API + '/files/' + fileId + '/download', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!resp.ok) throw new Error('下载失败');
+            const keyStr = atob(resp.headers.get('X-Encrypted-Key'));
+            const ct = new Uint8Array(await resp.arrayBuffer());
+            const aesKey = await eccDecrypt(privateKey, keyStr);
+            const dec = await aesDecrypt(new Blob([ct]), aesKey);
+            const blob = new Blob([dec]);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            let name = resp.headers.get('X-Filename') || 'download';
+            if (name.endsWith('.enc')) name = name.slice(0, -4);
+            a.download = name;
+            a.click();
+            URL.revokeObjectURL(url);
+            showSuccess('upload-msg', '下载成功');
+        } catch(e) { showError('upload-msg', '下载失败: ' + e.message); }
+    }
+
+    // 分享（使用独立密钥接口，不下载文件内容）
+    async function handleShare(fileId, targetUser) {
+        if (!targetUser) { alert('请输入目标用户名'); return; }
+        try {
+            const keyStr = await getFileKey(fileId);
+            const aesKey = await eccDecrypt(privateKey, keyStr);
+            const pubData = await api('GET', '/users/' + targetUser + '/public_key', null, true);
+            const pubKey = await importPubKey(pubData.public_key);
+            const encKey = await eccEncrypt(pubKey, aesKey);
+            await api('POST', '/files/' + fileId + '/share',
+                { target_username: targetUser, encrypted_aes_key: encKey }, true);
+            alert('分享给 ' + targetUser + ' 成功');
+        } catch(e) { alert('分享失败: ' + e.message); }
+    }
+
+    // 删除
+    async function handleDelete(fileId) {
+        if (!confirm('确定删除？')) return;
+        try {
+            await api('DELETE', '/files/' + fileId, null, true);
+            showSuccess('upload-msg', '删除成功');
+            refreshFileList();
+        } catch(e) { showError('upload-msg', '删除失败'); }
+    }
+
+    // 重命名
+    async function handleRename(fileId, newName) {
+        if (!newName) { alert('文件名不能为空'); return; }
+        try {
+            await api('PUT', '/files/' + fileId + '/rename', { new_name: newName }, true);
+            showSuccess('upload-msg', '重命名成功');
+            refreshFileList();
+        } catch(e) { showError('upload-msg', '重命名失败'); }
+    }
+
+    // 批量删除
+    async function batchDelete() {
+        const cbs = document.querySelectorAll('.file-checkbox:checked');
+        if (cbs.length === 0) { showError('upload-msg', '请先选择文件'); return; }
+        if (!confirm('确定删除选中的 ' + cbs.length + ' 个文件？')) return;
+        const ids = Array.from(cbs).map(cb => parseInt(cb.dataset.id));
+        try {
+            await api('POST', '/files/batch-delete', { file_ids: ids }, true);
+            showSuccess('upload-msg', '成功删除 ' + ids.length + ' 个文件');
+            refreshFileList();
+        } catch(e) { showError('upload-msg', '批量删除失败: ' + e.message); }
+    }
+
+    // 批量分享（使用独立密钥接口）
+    async function batchShare() {
+        const cbs = document.querySelectorAll('.file-checkbox:checked');
+        if (cbs.length === 0) { showError('upload-msg', '请先选择文件'); return; }
+        const target = prompt('请输入目标用户名:');
+        if (!target) return;
+        let ok = 0, fail = 0;
+        for (const cb of cbs) {
+            const id = parseInt(cb.dataset.id);
+            try {
+                const keyStr = await getFileKey(id);
+                const aesKey = await eccDecrypt(privateKey, keyStr);
+                const pubData = await api('GET', '/users/' + target + '/public_key', null, true);
+                const pubKey = await importPubKey(pubData.public_key);
+                const encKey = await eccEncrypt(pubKey, aesKey);
+                await api('POST', '/files/' + id + '/share',
+                    { target_username: target, encrypted_aes_key: encKey }, true);
+                ok++;
+            } catch(e) { fail++; }
+        }
+        showSuccess('upload-msg', '批量分享完成：成功 ' + ok + ' 个，失败 ' + fail + ' 个');
+        refreshFileList();
+    }
+
+    // ============================================================
+    //  渲染文件列表
+    // ============================================================
+    async function refreshFileList() {
+        try {
+            const files = await api('GET', '/files/list', null, true);
+            allFiles = files;
+        } catch(e) {
+            document.getElementById('fileListContainer').innerHTML =
+                '<div class="empty-state"><div class="icon">⚠️</div><h4>加载失败</h4><p>' + e.message + '</p></div>';
+            return;
+        }
+
+        const keyword = document.getElementById('searchInput').value.toLowerCase();
+        const filtered = keyword ? allFiles.filter(f => f.filename.toLowerCase().includes(keyword)) : allFiles;
+
+        document.getElementById('fileCount').textContent = filtered.length + ' 个';
+
+        const container = document.getElementById('fileListContainer');
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📂</div><h4>' +
+                (keyword ? '没有匹配的文件' : '暂无文件') + '</h4><p>' +
+                (keyword ? '试试其他关键词' : '点击上方按钮上传文件') + '</p></div>';
+            return;
+        }
+
+        let html = '';
+        for (const f of filtered) {
+            html += `
+                <div class="file-item">
+                    <div class="checkbox-col">
+                        <input type="checkbox" class="file-checkbox" data-id="${f.id}">
+                    </div>
+                    <div class="file-body">
+                        <div class="file-name">📄 ${escapeHtml(f.filename)}</div>
+                        <div class="file-meta">
+                            <span>ID: ${f.id}</span>
+                            <span>所有者: ${escapeHtml(f.owner_username || '?')}</span>
+                            <span>时间: ${formatTime(f.created_at)}</span>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-success btn-sm" onclick="handleDownload(${f.id})">⬇️ 下载</button>
+                            <button class="btn btn-warning btn-sm" onclick="toggleShare(${f.id})">🔗 分享</button>
+                            <button class="btn btn-danger btn-sm" onclick="handleDelete(${f.id})">🗑️ 删除</button>
+                            <button class="btn btn-default btn-sm" onclick="toggleRename(${f.id})">✏️ 重命名</button>
+                        </div>
+                        <div class="expand-form" id="share-form-${f.id}">
+                            <input type="text" id="share-target-${f.id}" placeholder="目标用户名">
+                            <button class="btn btn-primary btn-sm" onclick="handleShare(${f.id}, document.getElementById('share-target-${f.id}').value)">确认分享</button>
+                        </div>
+                        <div class="expand-form" id="rename-form-${f.id}">
+                            <input type="text" id="rename-name-${f.id}" value="${escapeHtml(f.filename)}">
+                            <button class="btn btn-primary btn-sm" onclick="handleRename(${f.id}, document.getElementById('rename-name-${f.id}').value)">确认重命名</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    function toggleShare(id) {
+        const el = document.getElementById('share-form-' + id);
+        el.classList.toggle('show');
+    }
+    function toggleRename(id) {
+        const el = document.getElementById('rename-form-' + id);
+        el.classList.toggle('show');
+    }
+
+    // ============================================================
+    //  初始化
+    // ============================================================
+    (function init() {
+        const savedToken = localStorage.getItem('token');
+        const savedUser = localStorage.getItem('user');
+        if (savedToken && savedUser) {
+            token = savedToken;
+            currentUser = savedUser;
+            const priv = localStorage.getItem('sk_' + savedUser);
+            if (priv) {
+                // 注意：这里初始加载时无法解密私钥，因为没有密码
+                // 需要用户重新登录才能使用私钥
+                privateKey = null;
+                document.getElementById('display-username').textContent = savedUser;
+                document.getElementById('userAvatar').textContent = savedUser.charAt(0).toUpperCase();
+                switchTab('files');
+                refreshFileList();
+            } else {
+                switchTab('register');
+            }
+        } else {
+            switchTab('register');
+        }
+        // 隐藏多余的tab-bar
+        const tabs = document.querySelectorAll('.tab-bar');
+        if (tabs.length > 1) {
+            for (let i = 1; i < tabs.length; i++) tabs[i].style.display = 'none';
+        }
+    })();
+</script>
+</body>
+</html>
