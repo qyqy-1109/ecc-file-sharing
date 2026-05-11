@@ -786,6 +786,7 @@
     async function decryptPrivateKey(encryptedData, password) {
         try {
             const data = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
+            if (data.length < 28) throw new Error('私钥数据不完整');
             const salt = data.slice(0, 16);
             const iv = data.slice(16, 28);
             const ciphertext = data.slice(28);
@@ -794,6 +795,8 @@
             const decoder = new TextDecoder();
             return decoder.decode(decrypted);
         } catch (e) {
+            console.error('私钥解密失败:', e);
+            if (e.message === '私钥数据不完整') throw new Error('私钥数据已损坏，请重新注册');
             throw new Error('密码错误或私钥数据已损坏');
         }
     }
@@ -994,6 +997,10 @@
         privateKey = null;
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        // 清除 sessionStorage 中的所有缓存私钥
+        for (const key of Object.keys(sessionStorage)) {
+            if (key.startsWith('priv_')) sessionStorage.removeItem(key);
+        }
         switchTab('register');
         document.getElementById('reg-username').value = '';
         document.getElementById('reg-password').value = '';
@@ -1087,6 +1094,8 @@
 
             // 用新密码加密的私钥替换旧记录
             localStorage.setItem('sk_' + currentUser, reEncrypted);
+            // 同步更新 sessionStorage 缓存
+            sessionStorage.setItem('priv_' + currentUser, privPem);
 
             alert('密码修改成功，请重新登录');
             closeModal('pwdModal');
