@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 环境变量（含密钥）
+.env
+
+# 文档
+docs/
+
+# 数据库（运行时创建）
+file_sharing.db
+file_sharing.db-*
+
+# 上传文件（运行时创建）
+uploads/*
+
+# 打包输出
+dist/
+build/
+*.spec
+
+# 测试缓存
+.pytest_cache/
+test.db
+
+# 系统
+Thumbs.db
+.DS_Store
