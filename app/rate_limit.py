@@ -20,6 +20,8 @@ class RateLimiter:
     def _clean_old(self, key: str, now: float) -> None:
         cutoff = now - self.window_seconds
         self._store[key] = [t for t in self._store[key] if t > cutoff]
+        if not self._store[key]:
+            del self._store[key]
 
     def is_allowed(self, key: str) -> bool:
         now = time.time()

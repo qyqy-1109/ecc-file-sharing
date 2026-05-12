@@ -1327,10 +1327,11 @@
             const cachedPriv = sessionStorage.getItem('priv_' + savedUser);
             if (priv || cachedPriv) {
                 if (cachedPriv) {
-                    // 从 sessionStorage 恢复私钥（刷新页面不丢失）
                     privateKey = await importPrivKey(cachedPriv);
                 } else {
-                    privateKey = null;
+                    // sessionStorage 缓存丢失（如新标签页打开），需重新登录解密私钥
+                    handleLogout();
+                    return;
                 }
                 document.getElementById('display-username').textContent = savedUser;
                 document.getElementById('userAvatar').textContent = savedUser.charAt(0).toUpperCase();

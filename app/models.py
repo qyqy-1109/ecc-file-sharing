@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, LargeBinary, ForeignKey, DateTime, Index
+from sqlalchemy import Column, Integer, String, LargeBinary, ForeignKey, DateTime, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from .database import Base
@@ -33,6 +33,7 @@ class FileKey(Base):
     __table_args__ = (
         Index("ix_file_keys_file_id", "file_id"),
         Index("ix_file_keys_user_id", "user_id"),
+        UniqueConstraint("file_id", "user_id", name="uq_file_keys_file_user"),
     )
     id = Column(Integer, primary_key=True, index=True)
     file_id = Column(Integer, ForeignKey("files.id"), nullable=False)
