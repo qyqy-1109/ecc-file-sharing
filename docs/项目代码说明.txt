@@ -1,0 +1,408 @@
+================================================================================
+                    ECC 文件共享系统 — 代码说明文档
+================================================================================
+
+项目目录: app/
+技术栈:   FastAPI + SQLAlchemy + SQLite + JWT + ECC 端到端加密
+前端:     原生 HTML/CSS/JavaScript（单页应用，约 1280 行）
+浏览器 API: Web Crypto API（ECC 密钥生成、ECDH 密钥协商、AES-GCM 加解密）
+
+环境要求:
+  - Python 3.9+
+  - 依赖安装: pip install -r requirements.txt
+  - 配置文件: 复制 .env.example 为 .env，设置 SECRET_KEY（必填）和 CORS_ORIGINS（可选）
+
+
+================================================================================
+一、__init__.py
+================================================================================
+【作用】Python 包标识文件，使 app 目录成为一个 Python 包，支持 from app import xxx
+        这种导入方式。
+
+
+================================================================================
+二、config.py — 应用配置
+================================================================================
+【作用】管理所有全局配置项，从 .env 文件加载环境变量。
+
+类 Settings:
+  ├── BASE_DIR              — 项目根目录绝对路径
+  ├── SECRET_KEY            — JWT 签名密钥（从 .env 读取，未设置则启动报错）
+  ├── ALGORITHM             — JWT 签名算法（HS256）
+  ├── ACCESS_TOKEN_EXPIRE_MINUTES — Token 过期时间（默认 1440 分钟 = 24 小时）
+  ├── DATABASE_URL          — SQLite 数据库文件路径
+  ├── UPLOAD_DIR            — 加密文件上传目录
+  └── validate()            — 启动时校验关键配置（SECRET_KEY 必填、算法合法性）
+
+全局实例:
+  settings — Settings 类单例，模块导入时自动加载 .env 并完成配置
+
+
+================================================================================
+三、database.py — 数据库连接与会话管理
+================================================================================
+【作用】创建 SQLAlchemy 引擎、会话工厂，提供依赖注入式的数据库会话。
+
+函数:
+  set_sqlite_pragma(dbapi_connection, connection_record)
+      — 事件监听器，每个连接建立时自动启用 WAL 模式、设置同步级别
+      — WAL 模式提升并发读写性能，NORMAL 同步在安全与速度之间取平衡
+
+  get_db()
+      — FastAPI 依赖注入生成器，每次请求创建独立数据库会话，请求结束自动关闭
+
+全局对象:
+  engine        — SQLAlchemy 数据库引擎（单例）
+  SessionLocal  — 线程级会话工厂
+  Base          — ORM 模型基类（DeclarativeBase），models.py 中的表类继承自它
+
+
+================================================================================
+四、models.py — 数据库 ORM 模型（4 张表）
+================================================================================
+【作用】定义数据库表结构及表间关系，通过 SQLAlchemy 映射为 Python 对象。
+
+类 User (表名: users):
+  ├── id             — 主键
+  ├── username       — 用户名（唯一索引）
+  ├── password_hash  — bcrypt 密码哈希
+  ├── public_key     — 用户 ECC 公钥（DER 二进制，服务器不存私钥）
+  ├── created_at     — 注册时间
+  ├── owned_files    — 一对多 → File（用户拥有的文件）
+  ├── file_keys      — 一对多 → FileKey（用户可访问的文件密钥）
+  └── logs           — 一对多 → Log（用户操作日志）
+
+类 File (表名: files):
+  ├── id             — 主键
+  ├── filename       — 原始文件名
+  ├── owner_id       — 外键 → users.id（文件拥有者）
+  ├── encrypted_path — 加密文件在服务器上的存储路径
+  ├── file_size      — 文件大小（字节）
+  ├── created_at     — 上传时间
+  ├── owner          — 多对一 → User
+  └── file_keys      — 一对多 → FileKey（关联的加密密钥记录）
+
+类 FileKey (表名: file_keys):
+  ├── id             — 主键
+  ├── file_id        — 外键 → files.id
+  ├── user_id        — 外键 → users.id
+  ├── encrypted_key  — 用目标用户公钥加密的 AES 密钥（实现安全分享）
+  ├── file           — 多对一 → File
+  └── user           — 多对一 → User
+
+类 Log (表名: logs):
+  ├── id             — 主键
+  ├── user_id        — 外键 → users.id
+  ├── action         — 操作类型（login/upload/download/share/delete 等）
+  ├── target         — 操作对象（文件名、用户名等）
+  ├── ip_address     — 操作者 IP 地址
+  ├── created_at     — 操作时间
+  └── user           — 多对一 → User
+
+
+================================================================================
+五、schemas.py — Pydantic 请求/响应模型
+================================================================================
+【作用】定义 API 接口的请求体和响应体结构，FastAPI 自动据此做数据校验和文档生成。
+
+类:
+  UserCreate           — 注册请求: username, password, public_key
+  UserLogin            — 登录请求: username, password
+  UserOut              — 用户信息响应: id, username, created_at
+  Token                — 登录响应: access_token, token_type
+  FileUploadResponse   — 上传响应: file_id, filename, message
+  FileInfo             — 文件列表响应: id, filename, owner_id, owner_username, ...
+  ShareRequest         — 分享请求: target_username, encrypted_aes_key
+  PublicKeyResponse    — 公钥查询响应: username, public_key
+  BatchDeleteRequest   — 批量删除请求: file_ids (int 列表)
+  ChangePasswordRequest — 修改密码请求: old_password, new_password
+  RenameRequest        — 重命名请求: new_name
+
+
+================================================================================
+六、auth.py — 认证与授权（/auth 路由组）
+================================================================================
+【作用】处理用户注册、登录、JWT 签发与校验、密码修改。
+
+函数:
+  verify_password(plain_password, hashed_password)
+      — 用 bcrypt 校验明文密码与哈希是否匹配
+
+  get_password_hash(password)
+      — 用 bcrypt 对密码做哈希
+
+  create_access_token(data, expires_delta)
+      — 签发 JWT Token，载荷含 sub（用户名）和 exp（过期时间）
+
+  get_current_user(token, db)
+      — FastAPI 依赖项，从请求 Bearer Token 中解析用户身份
+      — 解码 JWT → 查数据库 → 返回 User 对象
+      — Token 无效或用户不存在则返回 401
+
+API 端点:
+  POST /auth/register
+      — 用户注册，含速率限制（60s/5次）、密码长度校验（≥6位）
+      — 将用户公钥（base64 字符串）转为二进制存入数据库
+
+  POST /auth/login
+      — 用户登录，含速率限制（60s/10次）
+      — 验证用户名密码 → 签发 JWT → 记录审计日志
+
+  POST /auth/change-password
+      — 修改密码，需登录态，含速率限制（60s/5次）
+      — 校验旧密码 → 校验新密码长度 → 更新哈希 → 记录日志
+
+全局对象:
+  router              — APIRouter 实例，前缀 /auth
+  pwd_context         — CryptContext，使用 bcrypt 算法
+  oauth2_scheme       — OAuth2 密码持有者流程，token 获取地址为 /auth/login
+
+
+================================================================================
+七、users.py — 用户相关接口（/users 路由组）
+================================================================================
+【作用】提供用户公钥查询、当前用户信息、账户注销等用户相关的 API。
+
+API 端点:
+  GET /users/{username}/public_key
+      — 查询指定用户的 ECC 公钥（用于分享文件时加密 AES 密钥）
+      — 需要登录态，返回 base64 编码的公钥字符串
+
+  GET /users/me
+      — 获取当前登录用户的基本信息（id, username, created_at）
+
+  DELETE /users/me
+      — 注销当前登录账户（不可逆操作）
+      — 删除用户所有上传的加密文件（从磁盘物理删除）
+      — 级联删除用户拥有的文件记录、文件密钥记录、操作日志
+      — 其他用户分享给该用户的 FileKey 记录也会被清理
+      — 删除后 Token 立即失效，无法登录
+
+
+================================================================================
+八、files.py — 文件管理核心（/files 路由组）
+================================================================================
+【作用】处理文件上传、下载、列表、分享、删除、重命名、批量删除。
+
+API 端点:
+  POST /files/upload
+      — 上传加密文件，接收文件二进制 + 加密的 AES 密钥 + 原始文件名
+      — 分块写入磁盘（8KB 块），边写边校验大小（上限 50MB）
+      — 生成 UUID 作为存储文件名，记录文件和密钥到数据库
+
+  GET /files/list
+      — 列出当前用户可见的所有文件（自己拥有的 + 别人分享的）
+      — 一次批量查询所有 owner，避免 N+1 问题
+
+  GET /files/{file_id}/download
+      — 流式下载加密文件，以 application/octet-stream 返回
+      — 文件名和加密密钥通过 X-Filename、X-Encrypted-Key 响应头传递
+      — 客户端解密流程: 响应头取密钥 → ECC 私钥解密得 AES Key → 对流解密
+
+  GET /files/{file_id}/key
+      — 仅获取文件的加密密钥（用于分享流程），不返回文件内容本身
+
+  POST /files/{file_id}/share
+      — 将文件分享给指定用户，存入该用户的加密 AES 密钥
+      — 仅文件拥有者可分享，不可重复分享给同一用户
+
+  DELETE /files/{file_id}
+      — 删除文件及其关联密钥，同时删除磁盘上的加密文件
+      — 仅文件拥有者可删除
+
+  PUT /files/{file_id}/rename
+      — 重命名文件，仅文件拥有者可操作
+
+  POST /files/batch-delete
+      — 批量删除文件，接收 file_ids 列表
+      — 所有文件必须属于当前用户，任一文件不属于则全部拒绝
+
+
+================================================================================
+九、utils.py — 工具函数
+================================================================================
+【作用】通用辅助功能。
+
+函数:
+  log_action(db, user_id, action, target, request)
+      — 创建操作日志记录（只做 db.add，由调用方统一 commit）
+      — 记录操作用户、动作类型、操作对象、客户端 IP
+
+
+================================================================================
+十、rate_limit.py — 速率限制器
+================================================================================
+【作用】基于内存的滑动窗口速率限制，防止暴力破解和滥用。
+
+类 RateLimiter:
+  ├── __init__(max_requests, window_seconds)
+      — 设置时间窗口和最大请求数
+
+  ├── _clean_old(key, now)
+      — 清理窗口外过期的请求时间戳
+
+  └── is_allowed(key)
+      — 判断是否允许本次请求
+      — 返回 True 则放行并记录时间戳，False 则拒绝
+
+函数:
+  check_rate_limit(request, limiter, action)
+      — 从请求中提取客户端 IP，组合限流 key（ip:action）
+      — 超限时抛出 HTTP 429 错误
+
+预定义限流器:
+  login_limiter       — 登录: 60秒内最多 10 次
+  register_limiter    — 注册: 60秒内最多 5 次
+  change_pwd_limiter  — 改密: 60秒内最多 5 次
+
+
+================================================================================
+十一、main.py — 应用入口
+================================================================================
+【作用】创建 FastAPI 应用实例，注册中间件、路由、静态文件，启动应用。
+
+执行流程:
+  1. 配置 logging（时间 + 级别 + 模块名 + 消息）
+  2. 调用 config.settings.validate() 校验关键配置
+  3. 执行 Base.metadata.create_all() 自动建表
+  4. 创建 FastAPI 实例
+  5. 添加 CORS 中间件（允许跨域来源从环境变量 CORS_ORIGINS 读取）
+  6. 挂载 /static 静态文件目录
+  7. 注册 auth / users / files 三个路由组
+  8. 根路径 / 重定向到 /static/index.html
+
+启动方式:
+  uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+
+================================================================================
+十二、test.py — 手动测试脚本
+================================================================================
+【作用】对 /auth/login 端点的速率限制进行冒烟测试。
+
+执行逻辑:
+  循环发送 14 次错误密码的登录请求 → 前 10 次应返回 400（密码错误）
+  → 第 11 次起应返回 429（请求过于频繁）
+  → 每次请求间隔 0.2 秒，输出每次结果并标记 ✅/❌
+
+
+================================================================================
+十三、static/index.html — 前端单页应用
+================================================================================
+【作用】基于原生 HTML/CSS/JavaScript 的浏览器端单页应用，提供完整的用户界面。
+
+前端路由（Tab 切换）:
+  ├── 注册页    — 输入用户名、密码，浏览器生成 ECC 密钥对并上传公钥
+  ├── 登录页    — 用户名 + 密码登录
+  └── 文件页    — 登录后显示：上传、列表、下载、分享、重命名、删除、批量删除
+
+核心 JavaScript 函数:
+  genECC()                    — 调用 Web Crypto API 生成 P-384 ECDH 密钥对
+  pubKeyToPem(key)           — 公钥导出为 PEM 格式
+  privKeyToPem(key)          — 私钥导出为 PEM 格式
+  importPubKey(pem)          — 从 PEM 导入公钥
+  importPrivKey(pem)         — 从 PEM 导入私钥
+  eccEncrypt(pubKey, aesKey) — ECIES 加密：临时密钥 + ECDH + HKDF + AES-GCM
+  eccDecrypt(privKey, data)  — ECIES 解密
+  aesEncrypt(blob)           — AES-256-GCM 加密文件
+  aesDecrypt(blob, key)      — AES-256-GCM 解密文件
+
+  api(method, path, body, needAuth)
+      — 通用 API 请求封装，自动处理认证头、错误信息解析
+      — 使用相对路径（API = ''），避免跨域问题
+
+  handleRegister()           — 注册流程：生成密钥对 → 调用 /auth/register → 加密私钥存 localStorage
+  handleLogin()              — 登录流程：获取 Token → 解密恢复私钥 → 进入文件页
+  handleLogout()             — 登出：清除内存中 token/私钥，跳回注册页
+  handleDeleteAccount()      — 注销账户：弹出模态框，要求粘贴私钥进行 ECDH 验证
+  confirmDeleteAccount()     — 验证私钥 → 输入 DELETE 确认 → 调用 DELETE /users/me
+  handleUpload()             — 上传加密文件
+  handleDownload(fileId)     — 流式下载加密文件，从响应头取密钥
+  handleShare(fileId, user)  — 分享文件给指定用户
+  refreshFileList()          — 刷新文件列表
+
+密钥存储策略:
+  - 私钥: 用登录密码通过 PBKDF2 派生密钥加密后存 localStorage（sk_{username}）
+  - Token: 明文存 localStorage（有效期 24 小时）
+  - 浏览器刷新后: Token 有效则直接显示文件页，但私钥需重新登录才能解密
+
+安全措施:
+  - 注销账户需通过 ECDH 密钥派生验证私钥与服务器公钥匹配
+  - 私钥验证全程在浏览器端完成，不发送私钥到服务器
+  - API 请求使用相对路径，匹配当前域名，避免 CORS 问题
+
+
+================================================================================
+                    整体请求流程
+================================================================================
+
+【上传流程】
+  浏览器                                           服务器
+  1. 生成 ECC 密钥对（Web Crypto API）
+  2. 生成随机 AES 密钥
+  3. 用 AES 密钥加密文件
+  4. 用服务器公钥加密 AES 密钥     ──POST /auth/register──>   存入 users 表（仅公钥）
+     ... 注册后可登录 ...
+  5. 上传加密文件 + 加密的 AES 密钥  ──POST /files/upload──>   存入 files + file_keys 表
+
+【分享流程】
+  拥有者                                           服务器
+  1. 查询目标用户公钥             ──GET /users/{u}/public_key──>
+  2. 用目标用户公钥加密 AES 密钥
+  3. 提交分享                      ──POST /files/{id}/share──>  插入 file_keys 记录
+
+【下载流程】
+  接收者                                           服务器
+  1. 请求下载                      ──GET /files/{id}/download──> 流式返回加密文件
+  2. 从响应头取加密的 AES 密钥
+  3. 用自己的私钥解密得到 AES 密钥
+  4. 用 AES 密钥解密文件内容
+  5. 保存为明文文件到本地
+
+【注销流程】
+  用户                                             服务器
+  1. 点击「⚠️ 注销」按钮
+  2. 弹出模态框，粘贴私钥 PEM         ──GET /users/{u}/public_key──> 返回账户公钥
+  3. 浏览器端 ECDH 验证:
+     a. 生成临时 ECC 密钥对
+     b. deriveBits(临时私钥, 账户公钥) → 共享密钥 A
+     c. deriveBits(用户私钥, 临时公钥) → 共享密钥 B
+     d. 比较 A 与 B，相等则私钥正确
+  4. 私钥验证通过后，弹出二次确认
+     输入 "DELETE"
+  5. 确认后发送请求                ──DELETE /users/me──>  删除所有加密文件（磁盘）
+                                                         级联删除 files 记录
+                                                         级联删除 file_keys 记录
+                                                         级联删除 logs 记录
+                                                         删除 users 记录
+  6. 清除本地 token/私钥等数据
+  7. 跳转回注册页面
+
+  ★ 核心安全理念: 服务器从头到尾无法获取文件明文和用户私钥（零知识架构）
+
+
+================================================================================
+                          设计与安全说明
+================================================================================
+
+系统防护能力:
+  ✅ 防服务器泄露    — 文件以 AES-GCM 加密存储，AES 密钥被用户公钥加密，服务器无明文
+  ✅ 防传输窃听      — 网络传输的是已加密的文件和已加密的密钥
+  ✅ 防暴力破解      — 滑动窗口速率限制（登录/注册/改密），超限返回 429
+  ✅ 防密码枚举      — bcrypt 哈希 + 固定时间比较，彩虹表无效
+  ✅ 防账户冒用      — JWT Token 签名校验，注销需 ECDH 私钥验证
+  ✅ 防跨域攻击      — CORS 中间件限制允许的来源域名
+
+系统不防护（应在论文中说明）:
+  ⚠️ 前端 XSS        — 恶意脚本可窃取解密后的明文和私钥（需 CSP 头）
+  ⚠️ 本地存储泄露    — 私钥经密码加密后存 localStorage，若密码弱则不安全
+  ⚠️ 内存攻击        — 私钥在浏览器内存中以明文 CryptoKey 对象存在
+  ⚠️ 服务器物理安全  — 攻击者可删除或篡改加密文件（但无法解密）
+
+技术亮点:
+  - 混合加密架构: ECC(P-384) + AES-256-GCM + ECDH + HKDF
+  - 端到端加密: 文件在浏览器加密后上传，下载后在浏览器解密
+  - 零知识架构: 用户私钥仅在浏览器端生成和使用，服务器不接触
+  - 前向安全性: 每次加密使用临时 ECC 密钥对（ECIES 方案）
+  - 流式下载: 加密文件以 StreamingResponse 返回，支持大文件（50MB）
+  - 级联删除: 注销账户时自动清理所有关联数据（文件、密钥、日志）

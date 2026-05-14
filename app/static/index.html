@@ -1163,6 +1163,7 @@
             const a = document.createElement('a');
             a.href = url;
             let name = resp.headers.get('X-Filename') || 'download';
+            name = decodeURIComponent(name);
             if (name.endsWith('.enc')) name = name.slice(0, -4);
             a.download = name;
             a.click();
@@ -1329,9 +1330,22 @@
                 if (cachedPriv) {
                     privateKey = await importPrivKey(cachedPriv);
                 } else {
-                    // sessionStorage 缓存丢失（如新标签页打开），需重新登录解密私钥
-                    handleLogout();
-                    return;
+                    // sessionStorage 缓存丢失（如新标签页打开），提示输入密码解锁
+                    const pwd = prompt('请重新输入登录密码以解锁私钥：');
+                    if (pwd) {
+                        try {
+                            const privPem = await decryptPrivateKey(priv, pwd);
+                            privateKey = await importPrivKey(privPem);
+                            sessionStorage.setItem('priv_' + savedUser, privPem);
+                        } catch(e) {
+                            alert('密码错误，请重新登录');
+                            handleLogout();
+                            return;
+                        }
+                    } else {
+                        switchTab('login');
+                        return;
+                    }
                 }
                 document.getElementById('display-username').textContent = savedUser;
                 document.getElementById('userAvatar').textContent = savedUser.charAt(0).toUpperCase();

@@ -25,6 +25,9 @@ build/
 .pytest_cache/
 test.db
 
+# Claude Code 代理
+.claude/
+
 # 系统
 Thumbs.db
 .DS_Store
